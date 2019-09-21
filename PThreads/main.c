@@ -1,6 +1,16 @@
+#ifdef __linux__
+
+#else
+
+    #include <Windows.h>
+
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
+
 #define BOARD_ROWS 6
 #define BOARD_COLS 7
 
@@ -11,6 +21,7 @@ int checkFour(char *board, int, int, int, int);
 int horizontalCheck(char *board);
 int verticalCheck(char *board);
 int diagonalCheck(char *board);
+void clearScreen();
 
 int main(int argc, char *argv[]){
    const char *PIECES = "XO";
@@ -39,20 +50,37 @@ int main(int argc, char *argv[]){
    return 0;
 
 }
-void printBoard(char *board){
-   int row, col;
+void printBoard(char *board)
 
-   //system("clear");
-   puts("\n    ****Connect Four****\n");
-   for(row = 0; row < BOARD_ROWS; row++){
-      for(col = 0; col < BOARD_COLS; col++){
-         printf("| %c ",  board[BOARD_COLS * row + col]);
-      }
-      puts("|");
-      puts("-----------------------------");
+{
 
-   }
-   puts("  1   2   3   4   5   6   7\n");
+    int col;
+
+
+
+    clearScreen();
+
+    puts("\n    ****Connect Four****\n");
+
+    for(int row = 0; row < BOARD_ROWS; row++)
+
+    {
+
+        for(col = 0; col < BOARD_COLS; col++)
+
+        {
+
+            printf("| %c ",  board[BOARD_COLS * row + col]);
+
+        }
+
+        puts("|");
+
+        puts("-----------------------------");
+
+    }
+
+    puts("  1   2   3   4   5   6   7\n");
 
 }
 int takeTurn(char *board, int player, const char *PIECES){
@@ -131,5 +159,14 @@ int diagonalCheck(char *board){
       count = 0;
    }
    return 0;
+}
+void clearScreen()
+{
+#ifdef __linux__
+    printf("\e[2J\e[H");
+#else
+    system("clear");
+#endif // WIN32
 
 }
+
