@@ -10,10 +10,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #define BOARD_ROWS 6
 #define BOARD_COLS 7
 
+void clearScreen();
 void printBoard(char *board);
 int takeTurn(char *board, int player, const char*);
 int checkWin(char *board);
@@ -21,11 +23,21 @@ int checkFour(char *board, int, int, int, int);
 int horizontalCheck(char *board);
 int verticalCheck(char *board);
 int diagonalCheck(char *board);
-void clearScreen();
+void *putChip(void *args);
+
+const char *CHIPS = "XO";
+pthread_t tid;
+pthread_attr_t attr;
+pthread_mutex_t lock;
+struct putChip_params
+{
+    int player;
+    int col;
+    char* board;
+};
 
 int main(int argc, char *argv[])
 {
-    const char *PIECES = "XO";
     char board[BOARD_ROWS * BOARD_COLS];
     memset(board, ' ', BOARD_ROWS * BOARD_COLS);
 
@@ -34,7 +46,7 @@ int main(int argc, char *argv[])
     for(turn = 0; turn < BOARD_ROWS * BOARD_COLS && !done; turn++)
     {
         printBoard(board);
-        while(!takeTurn(board, turn % 2, PIECES))
+        while(!takeTurn(board, turn % 2, CHIPS))
         {
             printBoard(board);
             puts("**Column full!**\n");
@@ -50,7 +62,7 @@ int main(int argc, char *argv[])
     else
     {
         turn--;
-        printf("Player %d (%c) wins!\n", turn % 2 + 1, PIECES[turn % 2]);
+        printf("Player %d (%c) wins!\n", turn % 2 + 1, CHIPS[turn % 2]);
     }
 
     return 0;
@@ -89,10 +101,10 @@ void printBoard(char *board)
     puts("  1   2   3   4   5   6   7\n");
 
 }
-int takeTurn(char *board, int player, const char *PIECES)
+int takeTurn(char *board, int player, const char *CHIPS)
 {
-    int row, col = 0;
-    printf("Player %d (%c):\nEnter number coordinate: ", player + 1, PIECES[player]);
+    int col = 0;
+    printf("Player %d (%c):\nEnter number coordinate: ", player + 1, CHIPS[player]);
 
     while(1)
     {
@@ -108,16 +120,65 @@ int takeTurn(char *board, int player, const char *PIECES)
     }
     col--;
 
-    for(row = BOARD_ROWS - 1; row >= 0; row--)
-    {
-        if(board[BOARD_COLS * row + col] == ' ')
-        {
-            board[BOARD_COLS * row + col] = PIECES[player];
-            return 1;
-        }
-    }
-    return 0;
+	struct putChip_params p;
+    p.player = player;
+    p.col = col;
+    p.board = board;
+    pthread_attr_init(&attr);
 
+    if (pthread_mutex_init(&lock, NULL) != 0)
+    {
+        printf("\n mutex init has failed\n");
+        exit(0);
+    }
+
+    void *ret = (int)0;
+    pthread_create(&tid,&attr,putChip, (void*)&p);
+    pthread_join(tid,&ret);
+
+    pthread_mutex_destroy(&lock);
+
+    return (int)ret;
+}
+void *putChip(void *args)
+{
+    struct putChip_params *p = args;
+    int NextRow, CurrentRow;
+
+    pthread_mutex_lock(&lock);
+    for (int row = 0; row < BOARD_ROWS; row++)
+    {
+        NextRow = BOARD_COLS * (row+1) + p->col;
+        CurrentRow = BOARD_COLS * row + p->col;
+
+        if (p->board[NextRow] == ' ' && p->board[CurrentRow] == ' ')
+        {
+            p->board[CurrentRow] = CHIPS[p->player];
+            printBoard(p->board);
+            p->board[CurrentRow] = ' ';
+
+            if (NextRow >= 35)
+            {
+                p->board[NextRow] = CHIPS[p->player];
+                return (void*)1;
+            }
+        }
+        else if (p->board[NextRow] != ' ' && p->board[CurrentRow] == ' ')
+        {
+            p->board[CurrentRow] = CHIPS[p->player];
+            return (void*)1;
+        }
+        else if (p->board[NextRow] != ' ' && p->board[CurrentRow] != ' ')
+	    return (void*)0;
+#ifdef __linux__
+        fflush(stdout);
+        usleep(100000);
+#else
+        Sleep(100);
+#endif
+    }
+    pthread_mutex_unlock(&lock);
+    return (void*)0;
 }
 int checkWin(char *board)
 {
@@ -192,9 +253,13 @@ void clearScreen()
 {
 #ifdef __linux__
     printf("\e[2J\e[H");
+#endif
+
+#ifdef __WIN32
+    system("cls");
 #else
     system("clear");
-#endif // WIN32
+#endif
 
 }
 
