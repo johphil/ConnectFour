@@ -132,13 +132,13 @@ int takeTurn(char *board, int player, const char *CHIPS)
         exit(0);
     }
 
-    void *ret = (int)0;
+    void *ret;
     pthread_create(&tid,&attr,putChip, (void*)&p);
     pthread_join(tid,&ret);
 
     pthread_mutex_destroy(&lock);
-
-    return (int)ret;
+ 
+    return (int*)ret || (int*)ret;
 }
 void *putChip(void *args)
 {
