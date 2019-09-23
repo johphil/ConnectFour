@@ -1,34 +1,32 @@
 #ifdef __linux__
-
 #else
-
-#include <Windows.h>
-
+    #include <Windows.h>
 #endif
-
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <unistd.h>
 
 #define BOARD_ROWS 6
 #define BOARD_COLS 7
 
-void clearScreen();
 void printBoard(char *board);
+void clearScreen();
 int takeTurn(char *board, int player, const char*);
 int checkWin(char *board);
 int checkFour(char *board, int, int, int, int);
-int horizontalCheck(char *board);
-int verticalCheck(char *board);
-int diagonalCheck(char *board);
+void *horizontalCheck(void *board);
+void *verticalCheck(void *board);
+void *diagonalCheck(void *board);
 void *putChip(void *args);
 
 const char *CHIPS = "XO";
-pthread_t tid;
-pthread_attr_t attr;
+pthread_t tid, tid1, tid2, tid3;
+pthread_attr_t attr, attr1, attr2, attr3;
 pthread_mutex_t lock;
+
+
 struct putChip_params
 {
     int player;
@@ -38,8 +36,8 @@ struct putChip_params
 
 int main(int argc, char *argv[])
 {
-    char board[BOARD_ROWS * BOARD_COLS];
-    memset(board, ' ', BOARD_ROWS * BOARD_COLS);
+    char board[BOARD_ROWS * BOARD_COLS]; //board size = 6*7 = 42
+    memset(board, ' ', BOARD_ROWS * BOARD_COLS); //fill in board with spaces 42 times
 
     int turn, done = 0;
 
@@ -63,48 +61,45 @@ int main(int argc, char *argv[])
     {
         turn--;
         printf("Player %d (%c) wins!\n", turn % 2 + 1, CHIPS[turn % 2]);
+
+        printf("\nTerminate program in ");
+        for (int i = 3;i >= 0; i--)
+        {
+#ifdef __linux__
+            fflush(stdout);
+            sleep(1);
+#else
+            Sleep(1000);
+#endif
+            printf("%d ",i);
+        }
     }
 
     return 0;
 
 }
 void printBoard(char *board)
-
 {
-
     int col;
 
-
-
     clearScreen();
-
     puts("\n    ****Connect Four****\n");
-
     for(int row = 0; row < BOARD_ROWS; row++)
-
     {
-
         for(col = 0; col < BOARD_COLS; col++)
-
         {
-
             printf("| %c ",  board[BOARD_COLS * row + col]);
-
         }
-
         puts("|");
-
         puts("-----------------------------");
-
     }
-
     puts("  1   2   3   4   5   6   7\n");
-
 }
+
 int takeTurn(char *board, int player, const char *CHIPS)
 {
     int col = 0;
-    printf("Player %d (%c):\nEnter number coordinate: ", player + 1, CHIPS[player]);
+    printf("Player %d (%c):\nEnter column number: ", player + 1, CHIPS[player]);
 
     while(1)
     {
@@ -112,6 +107,7 @@ int takeTurn(char *board, int player, const char *CHIPS)
         {
             while(getchar() != '\n');
             puts("Number out of bounds! Try again.");
+            printf("Enter column number: ");
         }
         else
         {
@@ -120,7 +116,7 @@ int takeTurn(char *board, int player, const char *CHIPS)
     }
     col--;
 
-	struct putChip_params p;
+    struct putChip_params p;
     p.player = player;
     p.col = col;
     p.board = board;
@@ -132,13 +128,13 @@ int takeTurn(char *board, int player, const char *CHIPS)
         exit(0);
     }
 
-    void *ret;
+    void *ret = (int)0;
     pthread_create(&tid,&attr,putChip, (void*)&p);
     pthread_join(tid,&ret);
 
     pthread_mutex_destroy(&lock);
- 
-    return (int*)ret || (int*)ret;
+
+    return (int)ret;
 }
 void *putChip(void *args)
 {
@@ -182,72 +178,84 @@ void *putChip(void *args)
 }
 int checkWin(char *board)
 {
-    return (horizontalCheck(board) || verticalCheck(board) || diagonalCheck(board));
+    void *iret1, *iret2, *iret3 = (int)0;
 
+    pthread_attr_init(&attr1);
+    pthread_attr_init(&attr2);
+    pthread_attr_init(&attr3);
+
+    pthread_create(&tid1,&attr1,horizontalCheck, (void*)board);
+    pthread_create(&tid2,&attr2,verticalCheck, (void*)board);
+    pthread_create(&tid3,&attr3,diagonalCheck, (void*)board);
+
+    pthread_join(tid1,&iret1);
+    pthread_join(tid2,&iret2);
+    pthread_join(tid3,&iret3);
+
+    return ((int*)iret1 || (int*)iret2 || (int*)iret3);
 }
 int checkFour(char *board, int a, int b, int c, int d)
 {
     return (board[a] == board[b] && board[b] == board[c] && board[c] == board[d] && board[a] != ' ');
 
 }
-int horizontalCheck(char *board)
+void *horizontalCheck(void *board)
 {
-    int row, col, idx;
+    int col, idx;
     const int WIDTH = 1;
 
-    for(row = 0; row < BOARD_ROWS; row++)
+    for(int row = 0; row < BOARD_ROWS; row++)
     {
         for(col = 0; col < BOARD_COLS - 3; col++)
         {
             idx = BOARD_COLS * row + col;
-            if(checkFour(board, idx, idx + WIDTH, idx + WIDTH * 2, idx + WIDTH * 3))
+            if(checkFour((char*)board, idx, idx + WIDTH, idx + WIDTH * 2, idx + WIDTH * 3))
             {
-                return 1;
+                return (void *)1;
             }
         }
     }
-    return 0;
-
+    return (void *)0;
 }
-int verticalCheck(char *board)
+void *verticalCheck(void *board)
 {
-    int row, col, idx;
+    int col, idx;
     const int HEIGHT = 7;
 
-    for(row = 0; row < BOARD_ROWS - 3; row++)
+    for(int row = 0; row < BOARD_ROWS - 3; row++)
     {
         for(col = 0; col < BOARD_COLS; col++)
         {
             idx = BOARD_COLS * row + col;
-            if(checkFour(board, idx, idx + HEIGHT, idx + HEIGHT * 2, idx + HEIGHT * 3))
+            if(checkFour((char*)board, idx, idx + HEIGHT, idx + HEIGHT * 2, idx + HEIGHT * 3))
             {
-                return 1;
+                return (void *)1;
             }
         }
     }
-    return 0;
+    return (void *)0;
 
 }
-int diagonalCheck(char *board)
+void *diagonalCheck(void *board)
 {
-    int row, col, idx, count = 0;
+    int col, idx, count = 0;
     const int DIAG_RGT = 6, DIAG_LFT = 8;
 
-    for(row = 0; row < BOARD_ROWS - 3; row++)
+    for(int row = 0; row < BOARD_ROWS - 3; row++)
     {
         for(col = 0; col < BOARD_COLS; col++)
         {
             idx = BOARD_COLS * row + col;
-            if((count <= 3 && checkFour(board, idx, idx + DIAG_LFT, idx + DIAG_LFT * 2, idx + DIAG_LFT * 3)) ||
-                    (count >= 3 && checkFour(board, idx, idx + DIAG_RGT, idx + DIAG_RGT * 2, idx + DIAG_RGT * 3)))
+            if((count <= 3 && checkFour((char*)board, idx, idx + DIAG_LFT, idx + DIAG_LFT * 2, idx + DIAG_LFT * 3)) || (count >= 3 && checkFour((char*)board, idx, idx + DIAG_RGT, idx + DIAG_RGT * 2, idx + DIAG_RGT * 3)))
             {
-                return 1;
+                return (void *)1;
             }
             count++;
         }
         count = 0;
     }
-    return 0;
+    return (void *)0;
+
 }
 void clearScreen()
 {
@@ -260,6 +268,4 @@ void clearScreen()
 #else
     system("clear");
 #endif
-
 }
-
