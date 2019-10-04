@@ -1,0 +1,8 @@
+# depslib dependency file v1.0
+1570202463 source:c:\users\phil\dev\github\connectfour\openmp\main.c
+	<Windows.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<unistd.h>
+
